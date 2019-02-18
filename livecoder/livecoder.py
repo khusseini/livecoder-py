@@ -1,12 +1,14 @@
-from livecoder.sequencer import Sequencer
-from livecoder.player import Player
-from livecoder import midi
+import livecoder.midi as midi
+from livecoder.sequencer import MidiPlayer
 
 
 class LiveCoder:
-    def __init__(self, bpm: int = 110, fpb: int = 24):
-        self.sequencer = Sequencer(bpm, fpb)
-        self.player = Player(self.sequencer)
+    midi_player: MidiPlayer
+
+    def __init__(self):
+        self.server_port = None
+        self.server_port_address = ""
+        self.midi_player = MidiPlayer()
 
     @staticmethod
     def get_input_index():
@@ -24,23 +26,6 @@ class LiveCoder:
     def list_outputs():
         return midi.midi_opts["output_names"]
 
-    def select_output(self, index: int):
-        midi.select_output(index)
-        return self.get_output()
-
-    def select_input(self, index: int):
-        midi.select_input(index)
-        midi.get_selected_input().callback = self.on_message
-        return self.get_input()
-
-    def close(self):
-        self.player.stop()
-        i = 0
-        for o in self.list_outputs():
-            out = self.select_output(i)
-            out.reset()
-            i += 1
-
     @staticmethod
     def get_output():
         return midi.get_selected_output()
@@ -49,33 +34,72 @@ class LiveCoder:
     def get_input():
         return midi.get_selected_input()
 
-    def on_message(self, m):
-        player = self.player
+    def select_output(self, index: int):
+        midi.select_output(index)
+        self.midi_player.set_output(self.get_output())
+        return self.get_output()
 
+    def connect_server_port(self, address: str):
+        self.server_port_address = address
+        self.midi_player.output = self.server_port
+        if address == "-":
+            if self.server_port:
+                self.server_port.reset()
+                self.server_port.close()
+                self.server_port = None
+            return
+
+        self.server_port = midi.connect(address)
+
+    def select_input(self, index: int):
+        midi.select_input(index)
+        midi.get_selected_input().callback = self.on_message
+        return self.get_input()
+
+    def close(self):
+        if self.midi_player:
+            self.midi_player.stop()
+        if self.server_port:
+            self.server_port.reset()
+            self.server_port.close()
+            return
+        i = 0
+        for o in self.list_outputs():
+            out = self.select_output(i)
+            out.reset()
+            i += 1
+
+    def start(self):
+        if self.midi_player:
+            self.midi_player.play()
+
+    def stop(self):
+        self.get_output().reset()
+        if self.midi_player:
+            self.midi_player.stop()
+
+    def tick(self):
+        if self.midi_player:
+            self.midi_player.tick()
+
+    def on_message(self, m):
         if m.type == 'start':
-            player.compile()
-            player.start()
+            self.start()
             return
 
         if m.type == 'stop':
-            player.stop()
-            self.get_output().reset()
+            self.stop()
             return
 
         if m.type == 'continue':
-            player.compile()
-            player.start()
+            self.start()
             return
 
         if m.type == 'songpos':
-            player.stop()
-            player.compile()
-            self.get_output().reset()
+            self.stop()
             return
 
         if m.type == 'clock':
-            player.tick(self.on_send)
+            self.tick()
             return
 
-    def on_send(self, msg):
-        self.get_output().send(msg)

@@ -19,6 +19,7 @@ class Note:
         self.number = number
         self.velocity = 64
         self.offset = 0
+        self.length = 0
 
 
 def from_string(name: str, offset: int = -3) -> Note:

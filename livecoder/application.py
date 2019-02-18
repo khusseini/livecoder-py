@@ -1,6 +1,7 @@
 from livecoder.output import Output
 from livecoder.input import Input
-from livecoder.livecoder import LiveCoder
+from livecoder import LiveCoder
+import re
 import urwid
 
 
@@ -16,8 +17,12 @@ class Window(urwid.Frame):
 
 
 class Application:
-    def __init__(self, commands: list):
-        self.cmd_mode = False
+    cmd_mode: bool = False
+    livecoder: LiveCoder
+    output: Output
+    command: dict
+
+    def __init__(self, commands: dict):
         self.commands = commands
         self.livecoder = LiveCoder()
         self.output = Output()
@@ -29,7 +34,7 @@ class Application:
         ]
 
         commander = urwid.Edit('', multiline=False)
-        frame = Window(self.output.widget, commander, self.on_key)
+        frame = Window(self.output.widget, commander, self.on_window_keypress)
         loop = urwid.MainLoop(frame, palette=palette)
 
         self.loop = loop
@@ -47,13 +52,15 @@ class Application:
     def process_command(self, cmd: str):
         self.output.info('--> Received command: ' + repr(cmd))
         for c in self.commands:
-            if not cmd:
-                break
+            command = self.commands[c]["cmd"]
+            test = re.compile(c)
+            matches = test.match(cmd)
+            if matches:
+                result = command.run(**matches.groupdict())
+                if result is not None:
+                    cmd = result
 
-            if c.supports(cmd):
-                cmd = c.run(cmd, self.livecoder)
-
-    def on_key(self, key, size):
+    def on_window_keypress(self, key, size):
         if key == 'esc':
             self.input.hide()
             self.cmd_mode = False

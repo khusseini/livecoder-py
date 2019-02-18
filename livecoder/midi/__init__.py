@@ -1,6 +1,5 @@
 import mido
-from livecoder.note import Note
-
+from livecoder.sequencer.note import Note
 
 midi_opts = {
     'i_index': 0,
@@ -24,15 +23,16 @@ def get_selected_input():
     return None
 
 
-def select_output(index: int):
+def select_output(index: int) -> bool:
     if index > len(midi_opts["output_names"]) - 1 or index < 0:
         return False
     midi_opts["o_index"] = index
     if midi_opts["o_index"] not in midi_opts["outputs"]:
         midi_opts["outputs"][midi_opts["o_index"]] = mido.open_output(midi_opts["output_names"][index])
+    return True
 
 
-def select_input(index: int):
+def select_input(index: int) -> bool:
     if index > len(midi_opts["output_names"]) or index < 0:
         return False
     midi_opts["i_index"] = index
@@ -41,9 +41,14 @@ def select_input(index: int):
     return True
 
 
-def note_message(action: str, n: Note, ch: int = 0, time: int = 0):
+def connect(address: str) -> mido.sockets.SocketPort:
+    host, port = mido.sockets.parse_address(address)
+    return mido.sockets.connect(host, port)
+
+
+def note_message(action: str, n: Note, ch: int = 0, time: int = 0) -> mido.Message:
     return create_message(action, note=n.number, channel=ch, velocity=n.velocity, time=time)
 
 
-def create_message(message_type: str, **kwargs):
+def create_message(message_type: str, **kwargs) -> mido.Message:
     return mido.Message(message_type, **kwargs)
