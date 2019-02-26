@@ -1,3 +1,4 @@
-from .function import Function
+from .sequencer_function import SequencerFunction
 from .function_registry import FunctionRegistry
-from .drum_function import DrumFunction
+from .drums import Drums
+from .chords import Chords

@@ -15,11 +15,11 @@ note_regex = re.compile('([a-g])([#b])?(-?[1-9])?', re.IGNORECASE)
 
 
 class Note:
-    def __init__(self, number: int):
+    def __init__(self, number: int, length: float = 1/4, velocity: int = 64, offset:float = 0):
         self.number = number
-        self.velocity = 64
-        self.offset = 0
-        self.length = 0
+        self.velocity = velocity
+        self.offset = offset
+        self.length = length
 
 
 def from_string(name: str, offset: int = -3) -> Note:

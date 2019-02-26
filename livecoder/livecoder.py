@@ -36,12 +36,12 @@ class LiveCoder:
 
     def select_output(self, index: int):
         midi.select_output(index)
-        self.midi_player.set_output(self.get_output())
+        self.midi_player.output = self.get_output()
         return self.get_output()
 
     def connect_server_port(self, address: str):
         self.server_port_address = address
-        self.midi_player.output = self.server_port
+        self.midi_player._output = self.server_port
         if address == "-":
             if self.server_port:
                 self.server_port.reset()
@@ -80,7 +80,7 @@ class LiveCoder:
 
     def tick(self):
         if self.midi_player:
-            self.midi_player.tick()
+            self.midi_player.get_frame()
 
     def on_message(self, m):
         if m.type == 'start':

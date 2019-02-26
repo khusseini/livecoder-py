@@ -9,6 +9,9 @@ verify_ssl = true
 mido = "==1.2.9"
 python-rtmidi = "==1.2.1"
 urwid = "==2.0.1"
+lark-parser = "*"
+coverage = "*"
+python-dispatch = "*"
 
 [requires]
 python_version = "3.7"

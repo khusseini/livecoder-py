@@ -1,69 +1,94 @@
 from .functions import FunctionRegistry
+from .playable import Playable
+import collections
 
 
-class Clip:
-    repeats: int = 0
-    clip_fill: bool = False
-    sequence: list = []
-    function_registry: FunctionRegistry
-    dirty: bool = True
-    _compiled: []
-    last_signature: 0
+class Clip(Playable):
 
-    def __init__(self, function_registry: FunctionRegistry):
+    @property
+    def value(self):
+        return self._value
+
+    @property
+    def clip_fill(self):
+        return self._clip_fill
+
+    @clip_fill.setter
+    def clip_fill(self, value: bool):
+        self._clip_fill = value
+
+    @property
+    def clip_length(self):
+        return self._clip_length
+
+    @clip_length.setter
+    def clip_length(self, value: float):
+        self._clip_length = value
+
+    def __init__(self, value: str, function_registry: FunctionRegistry = None):
+        super(Clip, self).__init__()
+        self._clip_length: float
+        self._clip_fill: bool = False
+        self._sequences: dict = collections.OrderedDict()
+        self._function_registry: FunctionRegistry
+        self._value: str
+        self._value = value
         self.function_registry = function_registry
+        self._clip_length = 0
 
-    def add(self, object):
-        self.dirty = True
-        self.sequence.append(object)
+    def _has_function(self, name: str) -> bool:
+        if self.function_registry is None:
+            return False
+        return self.function_registry.has_function(name)
 
-    @staticmethod
-    def length_to_ticks(note_length: float, signature: float, fpb: int = 400) -> int:
-        return int(note_length * (fpb/signature))
+    def add_sequence(self, index, sequence: list):
+        self._is_dirty = True
+        self._sequences[index] = sequence
 
-    @staticmethod
-    def ticks_to_length(ticks: int, signature: float, fpb: int = 400) -> float:
-        return ticks / (fpb/signature)
+    def get_frames(self, frames_per_beat: int = 400, signature: float = 1 / 4) -> list:
+        self.compile(frames_per_beat, signature)
+        return self._compiled_frames
 
-    def get_ticks(self, signature: float = 1/4):
-        if self.dirty or self.last_signature != signature:
-            self._compiled = self.compile(signature)
-            self.dirty = False
-            self.last_signature = signature
+    def compile(self, frames_per_beat: int = 400, signature: float = 1 / 4):
+        super(Clip, self).compile(frames_per_beat, signature)
+        if not self._is_dirty:
+            return self._compiled_frames
+        self._is_dirty = False
 
-        return self._compiled
-
-    def compile(self, tpb: int = 400, signature: float = 1/4):
-        parts = []
-        max_length = 0
-        for raw_step in self.sequence:
-            func_name = raw_step["name"]
-            part_sequences = self.function_registry.call(func_name, **{"config": raw_step["args"]})
-            for p in part_sequences:
-                plen = 0
-                for seq in p:
-                    plen += seq.length
-                max_length = max(max_length, plen)
-                parts.append(p)
-
-        clip_length = self.length_to_ticks(max_length, signature, tpb)
         frames = []
-        repeat = self.clip_fill
 
-        for part in parts:
+        sequences = {}
+        for note_number in self._sequences:
+            items = self._sequences[note_number]
+            if self._has_function(note_number):
+                items = self.function_registry.call(note_number, **items)
+                for nn in items:
+                    if nn not in sequences:
+                        sequences[nn] = []
+                    sequences[nn] += items[nn]
+            else:
+                sequences[note_number] = items
+
+        repeat = self._clip_fill
+        clip_length = self.length_to_ticks(self._clip_length)
+
+        for note_number in sequences:
+            sequence = sequences[note_number]
+
             index = 0
             while True:
-                for note in part:
-                    if index+1 > len(frames):
+                for note in sequence:
+                    if index == len(frames):
                         frames.append([])
                     frames[index].append(note)
-                    frames_to_add = self.length_to_ticks(note.length, signature, tpb)
-                    added_index = 0
-                    for i in range(1, frames_to_add):
-                        added_index = i + index
-                        if added_index+1 > len(frames):
-                            frames.append([])
-                    index = added_index+1
-                if not repeat or index > clip_length-1:
+
+                    next_index = self.length_to_ticks(note.length) + index
+                    frames_to_add = max(next_index - len(frames), 0)
+                    index = next_index
+                    for i in range(0, frames_to_add):
+                        frames.append([])
+                if not repeat or index > clip_length - 1:
                     break
-        return frames
+
+        self._compiled_frames = frames
+        return self._compiled_frames

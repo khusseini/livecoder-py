@@ -1,0 +1,12 @@
+# .coveragerc to control coverage.py
+[run]
+branch = True
+include =
+    ./*
+omit =
+    ./test/*
+    ./setup.py
+    ./serve.py
+
+[html]
+directory = .coverage_html

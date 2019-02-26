@@ -1,5 +1,6 @@
 import re
 from livecoder.sequencer.note import Note
+from .sequencer_function import SequencerFunction
 
 interval_map = {
     'i': 0,
@@ -77,29 +78,60 @@ chord_mods = {
 interval_regex = re.compile('^(iv|i{1,3}|vi{0,2})(.*)$')
 
 
-class Chord:
-    def __init__(self, interval: str, scale: list = [0, 2, 4, 5, 7, 9, 11]):
-        self.interval = interval
-        self.scale = scale
-        matches = interval_regex.match(interval)
-        self.index = matches.group(1)
-        self.mod = matches.group(2)
-        if not self.mod:
-            self.mod = default_mods[self.index]
+class Chords(SequencerFunction):
+    def __init__(self, scale: list = [0, 2, 4, 5, 7, 9, 11]):
+        super().__init__(interval_regex)
+        self._scale = scale
+        self._key_note = Note(60)
 
-    def get_notes(self, key: Note, modifier: callable = None) -> list:
-        root = key.number + self.scale[interval_map[self.index]]
-        mod = chord_mods[self.mod]
+    def run(self, **kwargs):
+        return self.do_run(**kwargs)
+
+    @property
+    def key_note(self):
+        return self._key_note
+
+    @key_note.setter
+    def key_note(self, note: Note):
+        self._key_note = note
+
+    def do_run(self, called_name: str, groups: dict):
+        matches = interval_regex.match(called_name)
+        index = matches.group(1)
+        mod = matches.group(2)
+        if not mod:
+            mod = default_mods[index]
+        pitches = self.get_notes(index, mod)
+
+        notes = {}
+        index = 0
+        for pitch in pitches:
+            if pitch.number not in notes:
+                notes[pitch.number] = []
+
+            group_rhythm = groups.get(str(index), groups.get("_", []))
+            index += 1
+
+            for rhythm in group_rhythm:
+                note_number = pitch.number
+                if rhythm["is_pause"]:
+                    note_number = -1
+
+                note = Note(note_number, rhythm["length"])
+                notes[pitch.number].append(note)
+
+        return notes
+
+    def get_notes(self, index, mod) -> list:
+        key = self.key_note
+        root = key.number + self._scale[interval_map[index]]
+        mod = chord_mods[mod]
         notes = []
         if not mod:
             mod = []
 
-        i = 0
         for m in mod:
             note = Note(root + m)
-            if modifier is not None:
-                modifier(note, i)
-            i += 1
             notes.append(note)
 
         return notes
